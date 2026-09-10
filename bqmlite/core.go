@@ -1,31 +1,37 @@
 package bqmlite
 
-// Dataset is the input to a BQMLite training operation.
+import "context"
+
+// Row is one dataset record.
+type Row map[string]any
+
+// Dataset is immutable input data for an execution.
 type Dataset struct {
-	Name   string
-	Rows   []map[string]any
-	Target string
+	Name   string `json:"name"`
+	Rows   []Row  `json:"rows"`
+	Target string `json:"target,omitempty"`
 }
 
 // Model is a trained model with a stable prediction contract.
 type Model interface {
 	Name() string
-	Predict(row map[string]any) Prediction
+	Predict(Row) Prediction
 }
 
 // Prediction is one model output.
 type Prediction struct {
-	Value      any
-	Probability float64
+	Value       any     `json:"value"`
+	Probability float64 `json:"probability,omitempty"`
 }
 
-// PredictionResult contains predictions and model metadata.
+// PredictionResult is the reproducible output of an execution.
 type PredictionResult struct {
-	ModelName string
-	Results   []Prediction
+	ModelName string       `json:"model_name"`
+	Results   []Prediction `json:"results"`
 }
 
-// Engine trains a dataset into a model.
+// Engine trains datasets and produces models.
 type Engine interface {
-	Train(dataset Dataset) (Model, error)
+	Name() string
+	Train(context.Context, Dataset) (Model, error)
 }
