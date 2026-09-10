@@ -1,65 +1,93 @@
 # BQMLite Go
 
-Full-scratch Go implementation of **BQMLite**, a local BQML-compatible execution engine.
+Full-scratch Go implementation of **BQMLite**: a small, deterministic local execution engine inspired by the BQML workflow, without depending on BigQuery or an ML framework.
 
-> This repository is the new implementation. It does not migrate the legacy Python implementation into Go.
+> The legacy Python implementation is reference material only. It is not ported into this repository.
 
-## Direction
+## Architecture
 
 ```text
-BQML specification
-      ↓
-SQL / API
-      ↓
-Execution Plan
-      ↓
-BQMLite Engine
-      ↓
-Model / Prediction / Result
+SQL / JSON / Agent
+        ↓
+      Parser
+        ↓
+   Execution Plan
+        ↓
+      Registry
+        ↓
+      Engine
+        ↓
+ Model / Prediction
+        ↓
+      Result
+        ↓
+  Fingerprint
 ```
 
-The core contract is:
+Core flow:
 
 ```text
 Dataset → Train → Model → Predict → PredictionResult
 ```
 
-## Current vertical slice
+## Implemented
 
-- Go module
-- Core `Dataset`, `Model`, `Prediction`, `PredictionResult`, `Engine` contracts
-- Deterministic `MeanEngine` as the first dependency-free engine
-- Minimal `bqmlite` CLI
-- Unit test for the first engine
+- Core domain contracts: `Dataset`, `Row`, `Model`, `Prediction`, `PredictionResult`, `Engine`
+- Deterministic dependency-free `MeanEngine`
+- `Plan` + `Run` execution boundary
+- Engine `Registry` and `AutoEngine`
+- Local JSON dataset/result persistence
+- Minimal BQML-style `CREATE MODEL` parser/translator
+- Machine-readable Agent JSON boundary for OpenCode/Hermes
+- SHA-256 plan/result fingerprints for reproducibility
+- Station domain adapter with configurable feature weights
+- Deterministic unit tests
+- Thin CLI: `bqmlite -input dataset.json [-engine mean] [-output result.json]`
 
-## Planned layers
+## Dataset example
 
-```text
-cmd/bqmlite/
-bqmlite/
-  core/
-  sql/
-  plan/
-  engine/
-  storage/
-  model/
-  result/
-  station/
-examples/
-experiments/
-.opencode/skills/bqmlite/
-.hermes/skills/bqmlite/
+```json
+{
+  "name": "example",
+  "target": "y",
+  "rows": [
+    {"x": 1, "y": 2},
+    {"x": 2, "y": 4}
+  ]
+}
 ```
 
-## Principles
+Run:
 
-1. Full scratch: design the required engine instead of cleaning the old implementation.
-2. Go-first: native binary, clear interfaces, local execution.
-3. Python is an adapter/experiment layer, not the core.
-4. SQL is a front-end; execution is driven by an explicit plan.
-5. Agent interfaces remain thin and call the stable engine contract.
-6. Station suggestion is a domain application, not part of the ML core.
+```bash
+go test ./...
+go run ./cmd/bqmlite -input dataset.json
+```
+
+## Design boundaries
+
+- **Core** knows nothing about SQL, CLI, Station, agents, or ML frameworks.
+- **SQL** translates into a plan; it never calls an engine directly.
+- **Engine** is replaceable through the `Engine` interface.
+- **Storage** is an adapter and currently uses standard-library JSON.
+- **Agent** receives/sends JSON and does not contain ML logic.
+- **Station** is a domain adapter outside the core.
+
+## SQL subset
+
+The parser intentionally supports only a small, explicit subset of `CREATE MODEL`. Unsupported syntax fails rather than pretending to be BigQuery-compatible. This keeps the implementation honest and makes expansion testable.
+
+## Reproducibility
+
+A `Plan` and `PredictionResult` can be fingerprinted with SHA-256. Deterministic engines should produce identical results for identical inputs and configuration.
+
+## Non-goals
+
+- BigQuery compatibility in full
+- TensorFlow/Keras reimplementation
+- legacy Python API compatibility
+- hiding domain logic inside Agent skills
 
 ## Status
 
-Early foundation. The first goal is a small, deterministic vertical slice before adding SQL, storage, model families, and station suggestion.
+**Implemented foundation / first complete vertical slice.** Further model families can be added without changing the core contract.
