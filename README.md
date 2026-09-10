@@ -24,25 +24,23 @@ SQL / JSON / Agent
   Fingerprint
 ```
 
-Core flow:
-
-```text
-Dataset → Train → Model → Predict → PredictionResult
-```
+Core flow: `Dataset → Train → Model → Predict → PredictionResult`
 
 ## Implemented
 
-- Core domain contracts: `Dataset`, `Row`, `Model`, `Prediction`, `PredictionResult`, `Engine`
-- Deterministic dependency-free `MeanEngine`
+- Core contracts: `Dataset`, `Row`, `Model`, `Prediction`, `PredictionResult`, `Engine`
+- Deterministic dependency-free engines: `mean`, `linear_regression`, `logistic_regression`
 - `Plan` + `Run` execution boundary
-- Engine `Registry` and `AutoEngine`
-- Local JSON dataset/result persistence
+- Engine `Registry`, `AutoEngine`, and capability metadata
+- JSON dataset/result persistence
+- CSV dataset ingestion and schema validation
+- JSON model artifact save/load
 - Minimal BQML-style `CREATE MODEL` parser/translator
 - Machine-readable Agent JSON boundary for OpenCode/Hermes
 - SHA-256 plan/result fingerprints for reproducibility
 - Station domain adapter with configurable feature weights
-- Deterministic unit tests
-- Thin CLI: `bqmlite -input dataset.json [-engine mean] [-output result.json]`
+- Deterministic unit and regression/artifact tests
+- Thin CLI with JSON/CSV input and selectable engines
 
 ## Dataset example
 
@@ -61,7 +59,9 @@ Run:
 
 ```bash
 go test ./...
-go run ./cmd/bqmlite -input dataset.json
+go vet ./...
+go run ./cmd/bqmlite -input dataset.json -engine mean
+go run ./cmd/bqmlite -input dataset.csv -engine linear_regression
 ```
 
 ## Design boundaries
@@ -69,9 +69,11 @@ go run ./cmd/bqmlite -input dataset.json
 - **Core** knows nothing about SQL, CLI, Station, agents, or ML frameworks.
 - **SQL** translates into a plan; it never calls an engine directly.
 - **Engine** is replaceable through the `Engine` interface.
-- **Storage** is an adapter and currently uses standard-library JSON.
+- **Storage** is an adapter using standard-library JSON/CSV.
 - **Agent** receives/sends JSON and does not contain ML logic.
 - **Station** is a domain adapter outside the core.
+
+The current implementation intentionally keeps the public package compact. Splitting every concern into separate packages is a refactoring option, not a prerequisite for the execution contract.
 
 ## SQL subset
 
@@ -79,7 +81,15 @@ The parser intentionally supports only a small, explicit subset of `CREATE MODEL
 
 ## Reproducibility
 
-A `Plan` and `PredictionResult` can be fingerprinted with SHA-256. Deterministic engines should produce identical results for identical inputs and configuration.
+A `Plan` and `PredictionResult` can be fingerprinted with SHA-256. The included engines are deterministic for identical inputs and configuration; regression engines infer feature order lexicographically and use fixed training parameters.
+
+## Completion definition
+
+BQMLite-Go is considered complete at the **local execution-core** level when a defined BQML subset can execute reproducibly as:
+
+`Request → Plan → Engine → Model → Result`
+
+It is **not** intended to become a full BigQuery ML compatibility layer.
 
 ## Non-goals
 
@@ -87,7 +97,3 @@ A `Plan` and `PredictionResult` can be fingerprinted with SHA-256. Deterministic
 - TensorFlow/Keras reimplementation
 - legacy Python API compatibility
 - hiding domain logic inside Agent skills
-
-## Status
-
-**Implemented foundation / first complete vertical slice.** Further model families can be added without changing the core contract.
