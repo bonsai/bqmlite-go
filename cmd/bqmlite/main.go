@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/bonsai/bqmlite-go/bqmlite"
@@ -19,7 +20,7 @@ func main() {
 	if *input == "" { fmt.Fprintln(os.Stderr, "usage: bqmlite -input dataset.json|csv [-engine mean|linear_regression|logistic_regression] [-output result.json]"); os.Exit(2) }
 	var dataset bqmlite.Dataset
 	var err error
-	if strings.EqualFold(strings.TrimPrefix(strings.ToLower(*input), "."), "csv") { dataset,err=bqmlite.LoadCSV(*input) } else { dataset,err=bqmlite.LoadDataset(*input) }
+	if strings.EqualFold(filepath.Ext(*input), ".csv") { dataset,err=bqmlite.LoadCSV(*input) } else { dataset,err=bqmlite.LoadDataset(*input) }
 	if err != nil { fatal(err) }
 	registry := bqmlite.NewRegistry(bqmlite.MeanEngine{}, bqmlite.LinearRegressionEngine{}, bqmlite.LogisticRegressionEngine{})
 	result, err := bqmlite.Run(context.Background(), bqmlite.Plan{Dataset: dataset, Engine: *engine}, registry); if err != nil { fatal(err) }
